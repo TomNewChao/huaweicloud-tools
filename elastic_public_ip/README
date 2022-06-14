@@ -1,0 +1,8 @@
+1.使用以下命令安装使用
+sh -x jenkins_execute_shell.sh
+
+2.执行脚本：
+python3 collect_elastic_public_ip.py -ak xxxxxxxxxxxxxxxxxx -sk xxxxxxxxxxxxxxxxxx -project_id xxxxxxxxxxxxxxxxxx -zone cn-north-4
+python3 collect_elastic_public_ip_by_yaml.py  -config_path /root/collect_elastic_public_ip.yaml  
+# 不设置读取默认配置路径：当前目录下的collect_elastic_public_ip.yaml
+# collect_elastic_public_ip.yaml 文件位于obs：obs-for-openeuler-developer/secret-files 目录下；
