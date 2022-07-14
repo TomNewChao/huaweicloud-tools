@@ -16,7 +16,8 @@ from obs.client import ObsClient
 # noinspection DuplicatedCode
 class GlobalConfig(object):
     base_path = os.path.dirname(__file__)
-    scan_obs_result = os.path.join(base_path, "scan_obs_result.txt")
+    scan_obs_sensitive_file = os.path.join(base_path, "scan_obs_sensitive_file.txt")
+    scan_obs_anonymous_bucket = os.path.join(base_path, "scan_obs_anonymous_bucket.txt")
     config_path = os.path.join(base_path, "scan_obs.yaml")
 
     url = "obs.cn-north-4.myhuaweicloud.com"
@@ -52,8 +53,8 @@ class EipTools(object):
         super(EipTools, self).__init__(*args, **kwargs)
 
     @classmethod
-    def output_txt(cls, eip_info_list):
-        with open(GlobalConfig.scan_obs_result, "w", encoding="utf-8") as f:
+    def output_txt(cls, path, eip_info_list):
+        with open(path, "w", encoding="utf-8") as f:
             for content in eip_info_list:
                 f.write(content)
                 f.write("\n")
@@ -121,7 +122,7 @@ class EipTools(object):
 
     @classmethod
     def check_bucket_info(cls, obs_client, bucket_name, account):
-        list_result = list()
+        list_result, list_anonymous_bucket = list(), list()
         acl_list = cls.get_bucket_acl(obs_client, bucket_name)
         is_anonymous = False
         for acl_info in acl_list:
@@ -133,13 +134,16 @@ class EipTools(object):
             bucket_info_list = cls.get_bucket_obj(obs_client, bucket_name)
             for bucket_info in bucket_info_list:
                 file_name = bucket_info["key"]
+                anonymous_bucket = "{}:{}/{}".format(account, bucket_name, file_name)
+                print("find:{}".format(anonymous_bucket))
+                list_anonymous_bucket.append(anonymous_bucket)
                 file_name_list = file_name.rsplit(sep=".", maxsplit=1)
                 if len(file_name_list) >= 2:
                     if file_name_list[-1] in GlobalConfig.file_postfix:
                         file_temp = "{}:{}/{}".format(account, bucket_name, file_name)
                         print("collect:{}".format(file_temp))
                         list_result.append(file_temp)
-        return list_result
+        return list_result, list_anonymous_bucket
 
     @classmethod
     def get_bucket_list(cls, obs_client):
@@ -198,7 +202,7 @@ def main():
     config_list = eip_tools.load_yaml(config_path)
     eip_tools.check_config_data(config_list)
     print("############2.start to collect and output to txt######")
-    result_list = list()
+    result_list, list_anonymous_bucket = list(), list()
     for config_item in config_list:
         ak = config_item["ak"]
         sk = config_item["sk"]
@@ -208,9 +212,11 @@ def main():
             url = "https://obs.{}.myhuaweicloud.com".format(location)
             with ObsClientConn(ak, sk, url) as obs_client:
                 for bucket_name in bucket_name_list:
-                    ret_temp = eip_tools.check_bucket_info(obs_client, bucket_name, account)
+                    ret_temp, list_anonymous_bucket_temp = eip_tools.check_bucket_info(obs_client, bucket_name, account)
                     result_list.extend(ret_temp or [])
-    eip_tools.output_txt(result_list)
+                    list_anonymous_bucket.extend(list_anonymous_bucket_temp or [])
+    eip_tools.output_txt(GlobalConfig.scan_obs_sensitive_file, result_list)
+    eip_tools.output_txt(GlobalConfig.scan_obs_anonymous_bucket, list_anonymous_bucket)
     print("##################3.finish################")
 
 
