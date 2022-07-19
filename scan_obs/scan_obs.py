@@ -131,12 +131,12 @@ class EipTools(object):
                 is_anonymous = True
                 break
         if is_anonymous:
+            anonymous_bucket = "{}:{}".format(account, bucket_name)
+            print("find anonymous bucket:{}".format(anonymous_bucket))
+            list_anonymous_bucket.append(anonymous_bucket)
             bucket_info_list = cls.get_bucket_obj(obs_client, bucket_name)
             for bucket_info in bucket_info_list:
                 file_name = bucket_info["key"]
-                anonymous_bucket = "{}:{}/{}".format(account, bucket_name, file_name)
-                print("find:{}".format(anonymous_bucket))
-                list_anonymous_bucket.append(anonymous_bucket)
                 file_name_list = file_name.rsplit(sep=".", maxsplit=1)
                 if len(file_name_list) >= 2:
                     if file_name_list[-1] in GlobalConfig.file_postfix:
