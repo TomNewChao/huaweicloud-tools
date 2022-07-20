@@ -1,6 +1,6 @@
 使用说明：
-1.安装软件
-安装依赖：
+1.安装软件: 请注意安装软件与环境上已安装软件的兼容性
+安装：
 yum -y install gcc-c++
 yum -y install python3-devel
 yum -y install java-1.8.0-openjdk*
