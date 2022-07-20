@@ -1,6 +1,18 @@
 使用说明：
 1.安装软件
+安装依赖：
+yum -y install gcc-c++
+yum -y install python3-devel
+yum -y install java-1.8.0-openjdk*
+安装：
 pip3 install esdk-obs-python --trusted-host pypi.org
+pip3 install cocoNLP==0.0.11
+pip3 install argcomplete
+pip3 install phonenumbers
+pip3 install python-stdnum
+pip3 install textblob
+pip3 install jpype1
+pip3 install arrow
 
 
 2.修改scan_obs.yaml配置文件, 支持多账户采集
