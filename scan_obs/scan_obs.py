@@ -151,10 +151,7 @@ class EipTools(object):
         try:
             name = cls._ex.extract_name(content)
             if name:
-                if isinstance(name, list):
-                    sensitive_dict_data["name"] = [i for i in name]
-                else:
-                    sensitive_dict_data["name"] = name
+                sensitive_dict_data["name"] = name
         except Exception:
             pass
         sensitive_email = cls._ex.extract_email(content)
