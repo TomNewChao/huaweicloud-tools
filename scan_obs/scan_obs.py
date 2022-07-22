@@ -3,6 +3,7 @@
 # @Author  : Tom_zc
 # @FileName: scan_obs.py
 # @Software: PyCharm
+import json
 import os
 import argparse
 import time
@@ -108,6 +109,23 @@ class EipTools(object):
         return list_result
 
     @classmethod
+    def get_bucket_policy(cls, obs_client, bucket_name):
+        if not isinstance(obs_client, ObsClient):
+            raise Exception("obs_client must be instantiated")
+        try:
+            resp = obs_client.getBucketPolicy(bucket_name)
+            if resp.status < 300:
+                return resp.body.policyJSON
+            elif resp.errorCode == "NoSuchBucketPolicy":
+                return None
+            else:
+                print('get_bucket_bucket:errorCode:', resp.errorCode)
+                print('get_bucket_bucket:errorMessage:', resp.errorMessage)
+        except Exception as e:
+            print("get_bucket_acl:{}, traceback:{}".format(e, traceback.format_exc()))
+        return None
+
+    @classmethod
     def get_bucket_obj(cls, obs_client, bucket_name):
         if not isinstance(obs_client, ObsClient):
             raise Exception("obs_client must be instantiated")
@@ -130,11 +148,14 @@ class EipTools(object):
         content = str()
         resp = obs_client.getObject(bucket_name, obs_key, loadStreamInMemory=False)
         if resp.status < 300:
-            while True:
-                chunk = resp.body.response.read(65536)
-                if not chunk:
-                    break
-                content = "{}{}".format(content, chunk.decode("utf-8"))
+            try:
+                while True:
+                    chunk = resp.body.response.read(65536)
+                    if not chunk:
+                        break
+                    content = "{}{}".format(content, chunk.decode("utf-8"))
+            except Exception:
+                pass
             resp.body.response.close()
         elif resp.errorCode == "NoSuchKey":
             print("Key:{} is not exist, need to create".format(obs_key))
@@ -165,13 +186,23 @@ class EipTools(object):
     @classmethod
     def check_bucket_info(cls, obs_client, bucket_name, account):
         list_result, list_anonymous_bucket, list_anonymous_data = list(), list(), list()
-        acl_list = cls.get_bucket_acl(obs_client, bucket_name)
         is_anonymous = False
-        for acl_info in acl_list:
-            group_info = acl_info["grantee"].get("group")
-            if group_info is not None and acl_info["grantee"]["group"] == "Everyone":
-                is_anonymous = True
-                break
+        # first to judge bucket policy
+        policy_content = cls.get_bucket_policy(obs_client, bucket_name)
+        if policy_content:
+            policy_obj = json.loads(policy_content)
+            for statement_info in policy_obj["Statement"]:
+                if statement_info.get("Principal") is not None and r"*" in statement_info["Principal"]["ID"]:
+                    is_anonymous = True
+                    break
+        # second to judge bucket acl
+        if not is_anonymous:
+            acl_list = cls.get_bucket_acl(obs_client, bucket_name)
+            for acl_info in acl_list:
+                group_info = acl_info["grantee"].get("group")
+                if group_info is not None and acl_info["grantee"]["group"] == "Everyone":
+                    is_anonymous = True
+                    break
         if is_anonymous:
             anonymous_bucket = "{}:{}".format(account, bucket_name)
             print("find anonymous bucket:{}".format(anonymous_bucket))
@@ -186,10 +217,11 @@ class EipTools(object):
                         print("collect sensitive file:{}".format(file_temp))
                         list_result.append(file_temp)
                         content = cls.download_obs_data(obs_client, bucket_name, file_name)
-                        sensitive_data = cls.get_sensitive_data(content)
-                        if sensitive_data:
-                            data_temp = "{}:{}--->{}--->{}".format(account, bucket_name, file_name, str(sensitive_data))
-                            list_anonymous_data.append(data_temp)
+                        if content:
+                            sensitive_data = cls.get_sensitive_data(content)
+                            if sensitive_data:
+                                data_temp = "{}:{}--->{}--->{}".format(account, bucket_name, file_name, str(sensitive_data))
+                                list_anonymous_data.append(data_temp)
         return list_result, list_anonymous_bucket, list_anonymous_data
 
     @classmethod
