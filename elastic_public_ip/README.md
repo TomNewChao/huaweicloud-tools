@@ -1,4 +1,4 @@
-# 华为云弹性公网扫描工具:elastic_public_ip
+# 华为云弹性公网扫描工具: elastic_public_ip
 
 ## 1.背景
 
