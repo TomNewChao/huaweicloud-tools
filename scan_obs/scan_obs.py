@@ -9,6 +9,7 @@ import argparse
 import time
 import yaml
 import traceback
+import csv
 from collections import defaultdict
 from functools import wraps
 from obs.client import ObsClient
@@ -18,18 +19,13 @@ from cocoNLP.extractor import extractor
 # noinspection DuplicatedCode
 class GlobalConfig(object):
     base_path = os.path.dirname(__file__)
-    scan_obs_sensitive_file = os.path.join(base_path, "scan_obs_sensitive_file.txt")
-    scan_obs_anonymous_bucket = os.path.join(base_path, "scan_obs_anonymous_bucket.txt")
-    scan_obs_anonymous_data = os.path.join(base_path, "scan_obs_anonymous_data.txt")
+    scan_obs_sensitive_file = os.path.join(base_path, "scan_obs_sensitive_file.csv")
+    scan_obs_anonymous_bucket = os.path.join(base_path, "scan_obs_anonymous_bucket.csv")
+    scan_obs_anonymous_data = os.path.join(base_path, "scan_obs_anonymous_data.csv")
     config_path = os.path.join(base_path, "scan_obs.yaml")
 
     url = "obs.cn-north-4.myhuaweicloud.com"
-
-    file_postfix = ["sh", "java", "jsp", "log", "sql", "conf", "cer",
-                    "php", "php5", "asp", "cgi", "aspx", "war", "bat",
-                    "c", "cc", "cpp", "cs", "go", "lua", "perl", "pl",
-                    "py", "rb", "vb", "vbs", "vba", "h", "jar", "properties",
-                    "config", "class"]
+    base_url = "https://obs.{}.myhuaweicloud.com"
 
 
 def func_retry(tries=3, delay=1):
@@ -59,10 +55,9 @@ class EipTools(object):
 
     @classmethod
     def output_txt(cls, path, eip_info_list):
-        with open(path, "w", encoding="utf-8") as f:
-            for content in eip_info_list:
-                f.write(content)
-                f.write("\n")
+        with open(path, "w", encoding="utf-8", newline="\n") as f:
+            writer = csv.writer(f)
+            writer.writerows(eip_info_list)
 
     @classmethod
     def parse_input_args(cls):
@@ -82,8 +77,18 @@ class EipTools(object):
         return content
 
     @classmethod
-    def check_config_data(cls, config_list):
-        for config_temp in config_list:
+    def check_config_data(cls, config_obj):
+        if config_obj.get("check_bucket") is None:
+            raise Exception("check_bucket is invalid")
+        if config_obj.get("check_sensitive_file") is None:
+            raise Exception("check_sensitive_file is invalid")
+        if config_obj.get("check_sensitive_content") is None:
+            raise Exception("check_sensitive_content is invalid")
+        if config_obj.get("sensitive_file_suffix") is None:
+            raise Exception("sensitive_file_suffix is invalid")
+        if isinstance(config_obj.get("account_info"), dict):
+            raise Exception("account_info")
+        for config_temp in config_obj["account_info"]:
             if config_temp.get("account") is None:
                 raise Exception("Account is invalid")
             if config_temp.get("ak") is None:
@@ -142,6 +147,7 @@ class EipTools(object):
             print("get_bucket_obj:{}, traceback:{}".format(e, traceback.format_exc()))
         return list_result
 
+    # noinspection PyBroadException
     @classmethod
     def download_obs_data(cls, obs_client, bucket_name, obs_key):
         """download obs data"""
@@ -162,13 +168,14 @@ class EipTools(object):
         else:
             print('errorCode:', resp.errorCode)
             print('errorMessage:', resp.errorMessage)
-            raise Exception("get object failed：{}....".format(obs_key))
         return content
 
     # noinspection PyBroadException
     @classmethod
     def get_sensitive_data(cls, content):
         sensitive_dict_data = dict()
+        if not content:
+            return sensitive_dict_data
         try:
             name = cls._ex.extract_name(content)
             if name:
@@ -184,9 +191,11 @@ class EipTools(object):
         return sensitive_dict_data
 
     @classmethod
-    def check_bucket_info(cls, obs_client, bucket_name, account):
-        list_result, list_anonymous_bucket, list_anonymous_data = list(), list(), list()
+    def check_bucket_info(cls, config_obj, obs_client, bucket_name, account):
+        list_anonymous_file, list_anonymous_bucket, list_anonymous_data = list(), list(), list()
         is_anonymous = False
+        if not config_obj["check_bucket"] and not config_obj["check_sensitive_file"] and not config_obj["check_sensitive_content"]:
+            return list_anonymous_file, list_anonymous_bucket, list_anonymous_data
         # first to judge bucket policy
         policy_content = cls.get_bucket_policy(obs_client, bucket_name)
         if policy_content:
@@ -204,25 +213,28 @@ class EipTools(object):
                     is_anonymous = True
                     break
         if is_anonymous:
-            anonymous_bucket = "{}:{}".format(account, bucket_name)
-            print("find anonymous bucket:{}".format(anonymous_bucket))
-            list_anonymous_bucket.append(anonymous_bucket)
+            anonymous_bucket = [account, bucket_name]
+            print("collect anonymous bucket:{}".format(anonymous_bucket))
+            if config_obj["check_bucket"]:
+                list_anonymous_bucket.append(anonymous_bucket)
             bucket_info_list = cls.get_bucket_obj(obs_client, bucket_name)
             for bucket_info in bucket_info_list:
                 file_name = bucket_info["key"]
                 file_name_list = file_name.rsplit(sep=".", maxsplit=1)
                 if len(file_name_list) >= 2:
-                    if file_name_list[-1] in GlobalConfig.file_postfix:
-                        file_temp = "{}:{}/{}".format(account, bucket_name, file_name)
+                    if file_name_list[-1] in config_obj["sensitive_file_suffix"]:
+                        file_temp = [account, bucket_name, file_name]
                         print("collect sensitive file:{}".format(file_temp))
-                        list_result.append(file_temp)
-                        content = cls.download_obs_data(obs_client, bucket_name, file_name)
-                        if content:
+                        if config_obj["check_sensitive_file"]:
+                            list_anonymous_file.append(file_temp)
+                        if config_obj["check_sensitive_content"]:
+                            content = cls.download_obs_data(obs_client, bucket_name, file_name)
                             sensitive_data = cls.get_sensitive_data(content)
                             if sensitive_data:
-                                data_temp = "{}:{}--->{}--->{}".format(account, bucket_name, file_name, str(sensitive_data))
+                                data_temp = [account, bucket_name, file_name, str(sensitive_data)]
+                                print("collect sensitive data:{}".format(data_temp))
                                 list_anonymous_data.append(data_temp)
-        return list_result, list_anonymous_bucket, list_anonymous_data
+        return list_anonymous_file, list_anonymous_bucket, list_anonymous_data
 
     @classmethod
     def get_bucket_list(cls, obs_client):
@@ -278,21 +290,22 @@ def main():
         config_path = GlobalConfig.config_path
     else:
         config_path = input_args.config_path
-    config_list = eip_tools.load_yaml(config_path)
-    eip_tools.check_config_data(config_list)
+    config_obj = eip_tools.load_yaml(config_path)
+    eip_tools.check_config_data(config_obj)
     print("############2.start to collect and output to txt######")
     result_list, list_anonymous_bucket, list_anonymous_data = list(), list(), list()
-    for config_item in config_list:
+    for config_item in config_obj["account_info"]:
         ak = config_item["ak"]
         sk = config_item["sk"]
         account = config_item["account"]
         location_bucket = eip_tools.get_all_bucket(ak, sk, GlobalConfig.url)
         for location, bucket_name_list in location_bucket.items():
-            url = "https://obs.{}.myhuaweicloud.com".format(location)
+            url = GlobalConfig.base_url.format(location)
             with ObsClientConn(ak, sk, url) as obs_client:
                 for bucket_name in bucket_name_list:
                     ret_temp, list_anonymous_bucket_temp, list_anonymous_data_temp = eip_tools.check_bucket_info(
-                        obs_client, bucket_name, account)
+                        config_obj, obs_client,
+                        bucket_name, account)
                     result_list.extend(ret_temp or [])
                     list_anonymous_bucket.extend(list_anonymous_bucket_temp or [])
                     list_anonymous_data.extend(list_anonymous_data_temp or [])

@@ -1,3 +1,8 @@
+check_bucket: true
+check_sensitive_file: true
+check_sensitive_content: false
+sensitive_file_suffix: ["sh", "java", "jsp", "log", "sql", "conf", "cer", "php", "php5", "asp", "cgi", "aspx", "war", "bat","c", "cc", "cpp", "cs", "go", "lua", "perl", "pl","py", "rb", "vb", "vbs", "vba", "h", "jar", "properties","config", "class"]
+account_info:
 - account:
   ak:
   sk:

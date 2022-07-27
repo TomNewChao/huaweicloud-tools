@@ -1,5 +1,0 @@
-1.使用以下命令安装使用
-sh -x jenkins_execute_shell.sh
-
-2.执行脚本：
-python3 security_group_vpc.py -ak ***** -sk ****** -project_id ****** -end_point https://vpc.cn-north-4.myhuaweicloud.com
