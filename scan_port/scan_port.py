@@ -18,12 +18,16 @@ from collections import defaultdict
 
 from requests.packages.urllib3.exceptions import InsecureRequestWarning
 from huaweicloudsdkcore.auth.credentials import BasicCredentials
-from huaweicloudsdkcore.http.http_config import HttpConfig
 from huaweicloudsdkcore.client import Client
 from huaweicloudsdkeip.v2 import EipClient as EipClientV2
 from huaweicloudsdkeip.v2 import ListPublicipsRequest as ListPublicipsRequestV2
 from huaweicloudsdkeip.v3 import EipClient as EipClientV3
 from huaweicloudsdkeip.v3 import ListPublicipsRequest as ListPublicipsRequestV3
+from huaweicloudsdkcore.auth.credentials import GlobalCredentials
+from huaweicloudsdkiam.v3.region.iam_region import IamRegion
+from huaweicloudsdkcore.exceptions import exceptions
+from huaweicloudsdkiam.v3 import IamClient, KeystoneListProjectsRequest
+from huaweicloudsdkcore.http.http_config import HttpConfig
 
 requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
 
@@ -32,6 +36,7 @@ requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
 class GlobalConfig(object):
     base_path = os.path.dirname(__file__)
     txt_path = os.path.join(base_path, "ip.txt")
+    IGNORE_ZONE = ["cn-northeast-1", "MOS", "ap-southeast-1_tryme", "cn-north-1_1"]
 
     ip_result_path = os.path.join(base_path, "ip_result.txt")
     config_path = os.path.join(base_path, "scan_port.yaml")
@@ -144,6 +149,37 @@ class EipInstanceV3(BaseInstance):
         return response_dict['publicips']
 
 
+class HuaweiCloud(object):
+    @staticmethod
+    def get_iam_config():
+        config = HttpConfig.get_default_config()
+        config.ignore_ssl_verification = True
+        return config
+
+    @staticmethod
+    def get_project_zone(ak, sk):
+        list_data = list()
+        try:
+            credentials = GlobalCredentials(ak, sk)
+            config = HuaweiCloud.get_iam_config()
+            client = IamClient.new_builder().with_http_config(config)\
+                .with_credentials(credentials) \
+                .with_region(IamRegion.value_of("ap-southeast-1")) \
+                .build()
+            request = KeystoneListProjectsRequest()
+            response = client.keystone_list_projects(request)
+            for info in response.projects:
+                if info.name in GlobalConfig.IGNORE_ZONE:
+                    continue
+                list_data.append({"zone": info.name, "project_id": info.id})
+            print("[get_project_zone] collect project total:{}".format(len(list_data)))
+            return list_data
+        except exceptions.ClientRequestException as e:
+            print("ak:{}, sk:{} get project zone failed".format(ak[:5], sk[:5]))
+            print(e.status_code, e.request_id, e.error_code, e.error_msg)
+            return list_data
+
+
 # noinspection DuplicatedCode
 class EipTools(object):
     def __init__(self, *args, **kwargs):
@@ -197,7 +233,7 @@ class EipTools(object):
         return host_data
 
     @classmethod
-    def parse_tcp_result_txt(cls, tcp_content_list):
+    def parse_tcp_result_txt(cls, config_obj, tcp_content_list):
         ret_list = list()
         for info in tcp_content_list:
             if "Host:" in info and "Ports:" in info:
@@ -212,6 +248,8 @@ class EipTools(object):
                                 continue
                             port_str = port.groups()[0].strip()
                             port_content = list(filter(lambda x: x != "", port_str.split('/')))
+                            if config_obj["high_risk_port"] and int(port_content[0]) not in config_obj["high_risk_port"]:
+                                continue
                             ret_list.append(port_content)
         return ret_list
 
@@ -244,21 +282,14 @@ class EipTools(object):
         return content
 
     @classmethod
-    def check_config_data(cls, config_list):
-        for config_temp in config_list:
-            if config_temp.get("account") is None:
-                raise Exception("Account is invalid")
+    def check_config_data(cls, config_obj):
+        if config_obj.get("high_risk_port") is None:
+            raise Exception("high_risk_port is None")
+        for config_temp in config_obj["account_info"]:
             if config_temp.get("ak") is None:
                 raise Exception("Ak is invalid")
             if config_temp.get("sk") is None:
                 raise Exception("Sk is invalid")
-            if not isinstance(config_temp.get("project_info"), list):
-                raise Exception("project info must be dict")
-            for project_temp in config_temp["project_info"]:
-                if project_temp.get("project_id") is None:
-                    raise Exception("project_id is invalid")
-                if project_temp.get("zone") is None:
-                    raise Exception("project_id is invalid")
 
     @func_retry(tries=1)
     def get_data_list(self, eip_tools, project_temp, ak, sk):
@@ -341,14 +372,17 @@ def main():
         config_path = GlobalConfig.config_path
     else:
         config_path = input_args.config_path
-    config_list = eip_tools.load_yaml(config_path)
-    eip_tools.check_config_data(config_list)
+    config_obj = eip_tools.load_yaml(config_path)
+    eip_tools.check_config_data(config_obj)
     print("############2.start to collect and output to excel######")
     result_list = list()
-    for config_item in config_list:
+    for config_item in config_obj["account_info"]:
         ak = config_item["ak"]
         sk = config_item["sk"]
-        project_info = config_item["project_info"]
+        project_info = HuaweiCloud.get_project_zone(ak, sk)
+        if not project_info:
+            print("ak:{}, sk:{} get empty project info.".format(ak[:5], sk[:5]))
+            continue
         for project_temp in project_info:
             print("Collect the zone of info:{}".format(project_temp["zone"]))
             ret_temp = eip_tools.get_data_list(eip_tools, project_temp, ak, sk)
@@ -357,19 +391,14 @@ def main():
     print("Write the data to txt, the count of ip:{}...".format(len(result_list)))
     if not result_list:
         return
-    # eip_tools.output_txt(result_list)
-    # result_list = eip_tools.read_ip_txt()
     print("###########3.lookup port###################")
     tcp_ret_dict, udp_ret_dict = dict(), dict()
     for ip in result_list:
-        print("************************")
-        # ip = ip_infor.split("\n")[0]
-        print("parse ip:{}".format(ip))
         print("1.start to collect tcp info")
         eip_tools.execute_cmd(GlobalConfig.tcp_search_cmd.format(ip))
         tcp_content_list = eip_tools.read_ip_result_txt()
         print("parse tcp content:{}".format(tcp_content_list))
-        tcp_temp_list = eip_tools.parse_tcp_result_txt(tcp_content_list)
+        tcp_temp_list = eip_tools.parse_tcp_result_txt(config_obj, tcp_content_list)
         print("parse tcp port:{}".format(tcp_temp_list))
         tcp_ret_dict[ip] = tcp_temp_list
 
@@ -377,7 +406,7 @@ def main():
         eip_tools.execute_cmd(GlobalConfig.udp_search_cmd.format(ip))
         udp_content_list = eip_tools.read_ip_result_txt()
         print("parse udp content:{}".format(udp_content_list))
-        udp_temp_list = eip_tools.parse_tcp_result_txt(udp_content_list)
+        udp_temp_list = eip_tools.parse_tcp_result_txt(config_obj, udp_content_list)
         print("parse udp port:{}".format(udp_temp_list))
         udp_ret_dict[ip] = udp_temp_list
     print("Write the data to excel, the count of tcp ip:{}...".format(len(tcp_ret_dict.keys())))

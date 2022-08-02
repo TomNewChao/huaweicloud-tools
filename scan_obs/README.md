@@ -34,6 +34,10 @@ check_bucket: true   # 扫描匿名的桶，默认打开
 check_sensitive_file: true   # 扫描匿名的桶中的敏感文件，默认打开
 check_sensitive_content: false   #对扫描匿名的桶中的敏感文件提取敏感数据，默认关闭。
 sensitive_file_suffix: ["sh", "java", "jsp", "log", "sql", "conf", "cer", "php", "php5", "asp", "cgi", "aspx", "war", "bat","c", "cc", "cpp", "cs", "go", "lua", "perl", "pl","py", "rb", "vb", "vbs", "vba", "h", "jar", "properties","config", "class"]
+high_risk_action: [ "DeleteBucket", "PutBucketPolicy", "DeleteBucketPolicy", "Put*", "PutBucketLogging", "PutLifecycleConfiguration", "PutBucketWebsite", "DeleteBucketWebsite", "PutBucketVersions",
+                    "PutBucketCORS", "PutBucketAcl", "PutBucketVersioning", "PutBucketInventoryConfiguration", "DeleteBucketInventoryConfiguration", "PutBucketStoragePolicy", "PutReplicationConfiguration", "DeleteReplicationConfiguration",
+                    "PutBucketTagging", "DeleteBucketTagging", "PutBucketQuota", "PutBucketCustomDomainConfiguration", "DeleteBucketCustomDomainConfiguration", "PutDirectColdAccessConfiguration", "DeleteDirectColdAccessConfiguration","PutEncryptionConfiguration" ] 
+                    # 匿名用户对桶的行为权限
 account_info:
 - account: 华为云账户1
   ak:  华为云账户1的ak
