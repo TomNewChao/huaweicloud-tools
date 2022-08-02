@@ -21,9 +21,11 @@ class GlobalConfig(object):
     base_path = os.path.dirname(__file__)
     scan_obs_sensitive_file = os.path.join(base_path, "scan_obs_sensitive_file.csv")
     scan_obs_anonymous_bucket = os.path.join(base_path, "scan_obs_anonymous_bucket.csv")
+    scan_obs_high_risk_bucket = os.path.join(base_path, "scan_obs_high_risk_bucket.csv")
     scan_obs_anonymous_data = os.path.join(base_path, "scan_obs_anonymous_data.csv")
     config_path = os.path.join(base_path, "scan_obs.yaml")
-
+    OBS_BUCKET_URL = "https://{}.obs.{}.myhuaweicloud.com"
+    OBS_FILE_URL = "https://{}.obs.{}.myhuaweicloud.com/{}"
     url = "obs.cn-north-4.myhuaweicloud.com"
     base_url = "https://obs.{}.myhuaweicloud.com"
 
@@ -114,37 +116,35 @@ class EipTools(object):
         return list_result
 
     @classmethod
+    @func_retry()
     def get_bucket_policy(cls, obs_client, bucket_name):
         if not isinstance(obs_client, ObsClient):
             raise Exception("obs_client must be instantiated")
-        try:
-            resp = obs_client.getBucketPolicy(bucket_name)
-            if resp.status < 300:
-                return resp.body.policyJSON
-            elif resp.errorCode == "NoSuchBucketPolicy":
-                return None
-            else:
-                print('get_bucket_bucket:errorCode:', resp.errorCode)
-                print('get_bucket_bucket:errorMessage:', resp.errorMessage)
-        except Exception as e:
-            print("get_bucket_acl:{}, traceback:{}".format(e, traceback.format_exc()))
-        return None
+        resp = obs_client.getBucketPolicy(bucket_name)
+        if resp.status < 300:
+            return resp.body.policyJSON
+        elif resp.errorCode == "NoSuchBucketPolicy":
+            print("[get_bucket_policy] {} have no such bucket policy.".format(bucket_name))
+            return None
+        else:
+            print('get_bucket_bucket:errorCode:', resp.errorCode)
+            print('get_bucket_bucket:errorMessage:', resp.errorMessage)
+            raise Exception("[get_bucket_policy] {} get bucket policy failed".format(bucket_name))
 
     @classmethod
+    @func_retry()
     def get_bucket_obj(cls, obs_client, bucket_name):
         if not isinstance(obs_client, ObsClient):
             raise Exception("obs_client must be instantiated")
         list_result = list()
-        try:
-            resp = obs_client.listObjects(bucket_name, max_keys=100000)
-            if resp.status < 300:
-                for content in resp.body.contents:
-                    list_result.append(content)
-            else:
-                print('get_bucket_obj:errorCode:', resp.errorCode)
-                print('get_bucket_obj:errorMessage:', resp.errorMessage)
-        except Exception as e:
-            print("get_bucket_obj:{}, traceback:{}".format(e, traceback.format_exc()))
+        resp = obs_client.listObjects(bucket_name, max_keys=100000)
+        if resp.status < 300:
+            for content in resp.body.contents:
+                list_result.append(content)
+        else:
+            print('get_bucket_obj:errorCode:', resp.errorCode)
+            print('get_bucket_obj:errorMessage:', resp.errorMessage)
+            raise Exception("[get_bucket_obj] {} list objects failed".format(bucket_name))
         return list_result
 
     # noinspection PyBroadException
@@ -191,11 +191,11 @@ class EipTools(object):
         return sensitive_dict_data
 
     @classmethod
-    def check_bucket_info(cls, config_obj, obs_client, bucket_name, account):
-        list_anonymous_file, list_anonymous_bucket, list_anonymous_data = list(), list(), list()
+    def check_bucket_info(cls, config_obj, obs_client, bucket_name, account, zone):
+        list_anonymous_file, list_anonymous_bucket, list_anonymous_data, list_high_risk_bucket = list(), list(), list(), list()
         is_anonymous = False
         if not config_obj["check_bucket"] and not config_obj["check_sensitive_file"] and not config_obj["check_sensitive_content"]:
-            return list_anonymous_file, list_anonymous_bucket, list_anonymous_data
+            return list_anonymous_bucket, list_high_risk_bucket, list_anonymous_file, list_anonymous_data
         # first to judge bucket policy
         policy_content = cls.get_bucket_policy(obs_client, bucket_name)
         if policy_content:
@@ -203,6 +203,13 @@ class EipTools(object):
             for statement_info in policy_obj["Statement"]:
                 if statement_info.get("Principal") is not None and r"*" in statement_info["Principal"]["ID"]:
                     is_anonymous = True
+                    action_list = statement_info.get("Action")
+                    if isinstance(action_list, list):
+                        for action_info in action_list:
+                            if action_info in config_obj["high_risk_action"]:
+                                bucket_url = GlobalConfig.OBS_BUCKET_URL.format(bucket_name, zone)
+                                list_high_risk_bucket.append([account, bucket_name, bucket_url])
+                                break
                     break
         # second to judge bucket acl
         if not is_anonymous:
@@ -213,7 +220,8 @@ class EipTools(object):
                     is_anonymous = True
                     break
         if is_anonymous:
-            anonymous_bucket = [account, bucket_name]
+            bucket_url = GlobalConfig.OBS_BUCKET_URL.format(bucket_name, zone)
+            anonymous_bucket = [account, bucket_name, bucket_url]
             print("collect anonymous bucket:{}".format(anonymous_bucket))
             if config_obj["check_bucket"]:
                 list_anonymous_bucket.append(anonymous_bucket)
@@ -223,7 +231,8 @@ class EipTools(object):
                 file_name_list = file_name.rsplit(sep=".", maxsplit=1)
                 if len(file_name_list) >= 2:
                     if file_name_list[-1] in config_obj["sensitive_file_suffix"]:
-                        file_temp = [account, bucket_name, file_name]
+                        file_url = GlobalConfig.OBS_FILE_URL.format(bucket_name, zone, file_name)
+                        file_temp = [account, bucket_name, file_url, file_name]
                         print("collect sensitive file:{}".format(file_temp))
                         if config_obj["check_sensitive_file"]:
                             list_anonymous_file.append(file_temp)
@@ -231,10 +240,10 @@ class EipTools(object):
                             content = cls.download_obs_data(obs_client, bucket_name, file_name)
                             sensitive_data = cls.get_sensitive_data(content)
                             if sensitive_data:
-                                data_temp = [account, bucket_name, file_name, str(sensitive_data)]
+                                data_temp = [account, bucket_name, file_url, file_name, str(sensitive_data)]
                                 print("collect sensitive data:{}".format(data_temp))
                                 list_anonymous_data.append(data_temp)
-        return list_anonymous_file, list_anonymous_bucket, list_anonymous_data
+        return list_anonymous_bucket, list_high_risk_bucket, list_anonymous_file, list_anonymous_data
 
     @classmethod
     def get_bucket_list(cls, obs_client):
@@ -293,7 +302,7 @@ def main():
     config_obj = eip_tools.load_yaml(config_path)
     eip_tools.check_config_data(config_obj)
     print("############2.start to collect and output to txt######")
-    result_list, list_anonymous_bucket, list_anonymous_data = list(), list(), list()
+    list_anonymous_file, list_anonymous_bucket, list_anonymous_data, list_high_risk_bucket = list(), list(), list(), list()
     for config_item in config_obj["account_info"]:
         ak = config_item["ak"]
         sk = config_item["sk"]
@@ -303,14 +312,15 @@ def main():
             url = GlobalConfig.base_url.format(location)
             with ObsClientConn(ak, sk, url) as obs_client:
                 for bucket_name in bucket_name_list:
-                    ret_temp, list_anonymous_bucket_temp, list_anonymous_data_temp = eip_tools.check_bucket_info(
-                        config_obj, obs_client,
-                        bucket_name, account)
-                    result_list.extend(ret_temp or [])
+                    list_anonymous_bucket_temp, list_high_risk_bucket_temp, list_anonymous_file_temp, list_anonymous_data_temp = eip_tools.check_bucket_info(
+                        config_obj, obs_client, bucket_name, account, location)
                     list_anonymous_bucket.extend(list_anonymous_bucket_temp or [])
+                    list_high_risk_bucket.extend(list_high_risk_bucket_temp or [])
+                    list_anonymous_file.extend(list_anonymous_file_temp or [])
                     list_anonymous_data.extend(list_anonymous_data_temp or [])
-    eip_tools.output_txt(GlobalConfig.scan_obs_sensitive_file, result_list)
     eip_tools.output_txt(GlobalConfig.scan_obs_anonymous_bucket, list_anonymous_bucket)
+    eip_tools.output_txt(GlobalConfig.scan_obs_high_risk_bucket, list_high_risk_bucket)
+    eip_tools.output_txt(GlobalConfig.scan_obs_sensitive_file, list_anonymous_file)
     eip_tools.output_txt(GlobalConfig.scan_obs_anonymous_data, list_anonymous_data)
     print("##################3.finish################")
 
