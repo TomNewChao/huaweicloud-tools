@@ -31,6 +31,7 @@ class GlobalConfig(object):
 class Domain(object):
     huawei_cloud_domain = "repo.huaweicloud.com"
     gitee_domain = "gitee.com"
+    s3_gitee_domain = "s3.gitee.com"
 
     @classmethod
     def get_domain_template(cls):
@@ -48,6 +49,18 @@ class Domain(object):
             },
             cls.gitee_domain: {
                 'description': cls.gitee_domain,
+                'security_group_id': '',
+                'direction': 'egress',
+                'ethertype': 'IPv4',
+                'protocol': None,
+                'port_range_min': None,
+                'port_range_max': None,
+                'remote_ip_prefix': '',
+                'remote_group_id': None
+
+            },
+            cls.s3_gitee_domain: {
+                'description': cls.s3_gitee_domain,
                 'security_group_id': '',
                 'direction': 'egress',
                 'ethertype': 'IPv4',
