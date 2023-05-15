@@ -1,0 +1,8 @@
+requests
+click
+PyYAML
+esdk-obs-python
+huaweicloudsdkcore
+huaweicloudsdknat
+huaweicloudsdkiam
+huaweicloudsdkvpc
