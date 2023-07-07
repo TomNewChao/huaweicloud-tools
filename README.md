@@ -9,3 +9,5 @@
 ### 华为云安全策略组更新工具: security_group
 
 ### 华为云安全策略组ip查询工具: get_security_group
+
+### 华为云pod端口查询工具: scan_pod_port

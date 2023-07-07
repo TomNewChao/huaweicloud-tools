@@ -1,0 +1,26 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: scan-containers-port
+  namespace: {namespace}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: scan-containers-port
+  template:
+    metadata:
+      labels:
+        app: scan-containers-port
+    spec:
+      containers:
+      - image: swr.cn-north-4.myhuaweicloud.com/opensourceway/mindspore/mindspore-usercenter:0f2c2bf9d7fc0a79ca9ea35fb8dc2588bf7f0bf4
+        imagePullPolicy: IfNotPresent
+        name: scan-containers-port
+        resources:
+          limits:
+            cpu: 1000m
+            memory: 1000Mi
+          requests:
+            cpu: 500m
+            memory: 500Mi
