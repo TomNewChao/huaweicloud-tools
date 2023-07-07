@@ -14,7 +14,7 @@ spec:
         app: scan-containers-port
     spec:
       containers:
-      - image: swr.cn-north-4.myhuaweicloud.com/opensourceway/mindspore/mindspore-usercenter:0f2c2bf9d7fc0a79ca9ea35fb8dc2588bf7f0bf4
+      - image: swr.cn-north-4.myhuaweicloud.com/opensourceway/common/scan-pod-port:v1.0
         imagePullPolicy: IfNotPresent
         name: scan-containers-port
         resources:
