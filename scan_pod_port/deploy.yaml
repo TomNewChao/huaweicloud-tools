@@ -2,7 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: scan-containers-port
-  namespace: {namespace}
+  namespace: namespacevalue
 spec:
   replicas: 1
   selector:
@@ -14,8 +14,8 @@ spec:
         app: scan-containers-port
     spec:
       containers:
-      - image: swr.cn-north-4.myhuaweicloud.com/opensourceway/common/scan-pod-port:v1.0
-        imagePullPolicy: IfNotPresent
+      - image: swr.cn-north-4.myhuaweicloud.com/opensourceway/common/scan-pod-port:v2.0
+        imagePullPolicy: Always
         name: scan-containers-port
         resources:
           limits:
