@@ -17,9 +17,11 @@ namespace: 命名空间
 # 脚本流程：
 1.通过kubeconfig和namespace创建deployment任务。 
 
-2.通过kubectl cp ./deploy.yaml 拷贝到pod中
+2.通过kubectl cp /root/kubeconfig.yaml，将kubeconfig拷贝到pod中。
 
-3.通过kubectl exec -it /bin/bash python3 scan_pod_port.py
+3.通过kubectl exec -it /bin/bash python3 scan_pod_port.py --namespace $namespace
 
 4.通过kubectl logs查看执行结果
+
+5.销毁pod.
 
