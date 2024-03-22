@@ -203,7 +203,7 @@ def main():
                     all_anonymous_file_list.extend(anonymous_file_list)
     print("############3.start to output to txt######")
     with open("./result.txt", "w") as f:
-        f.writelines(all_anonymous_file_list)
+        f.write("\n".join(all_anonymous_file_list))
     print("##################4.finish################")
 
 
