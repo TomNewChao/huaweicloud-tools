@@ -162,7 +162,7 @@ class HuaweiCloud(object):
         try:
             credentials = GlobalCredentials(ak, sk)
             config = HuaweiCloud.get_iam_config()
-            client = IamClient.new_builder().with_http_config(config)\
+            client = IamClient.new_builder().with_http_config(config) \
                 .with_credentials(credentials) \
                 .with_region(IamRegion.value_of("ap-southeast-1")) \
                 .build()
@@ -233,8 +233,8 @@ class EipTools(object):
         return host_data
 
     @classmethod
-    def parse_tcp_result_txt(cls, config_obj, tcp_content_list):
-        ret_list = list()
+    def parse_result_txt(cls, config_obj, tcp_content_list):
+        high_port, all_port = list(), list()
         for info in tcp_content_list:
             if "Host:" in info and "Ports:" in info:
                 info_list = info.split("Ports:")
@@ -248,10 +248,11 @@ class EipTools(object):
                                 continue
                             port_str = port.groups()[0].strip()
                             port_content = list(filter(lambda x: x != "", port_str.split('/')))
-                            if config_obj["high_risk_port"] and int(port_content[0]) not in config_obj["high_risk_port"]:
-                                continue
-                            ret_list.append(port_content)
-        return ret_list
+                            if config_obj.get("high_risk_port") is not None and int(port_content[0]) in config_obj[
+                                "high_risk_port"]:
+                                high_port.append(port_content)
+                            all_port.append(port_content)
+        return high_port, all_port
 
     @classmethod
     def get_device_info(cls, instance_list):
@@ -392,27 +393,31 @@ def main():
     if not result_list:
         return
     print("###########3.lookup port###################")
-    tcp_ret_dict, udp_ret_dict = dict(), dict()
+    tcp_ret_dict, udp_ret_dict, all_port = dict(), dict(), dict()
     for ip in result_list:
         print("1.start to collect tcp info")
         eip_tools.execute_cmd(GlobalConfig.tcp_search_cmd.format(ip))
         tcp_content_list = eip_tools.read_ip_result_txt()
         print("parse tcp content:{}".format(tcp_content_list))
-        tcp_temp_list = eip_tools.parse_tcp_result_txt(config_obj, tcp_content_list)
-        print("parse tcp port:{}".format(tcp_temp_list))
-        tcp_ret_dict[ip] = tcp_temp_list
+        high_port, tcp_port = eip_tools.parse_result_txt(config_obj, tcp_content_list)
+        print("parse tcp port:{}".format(high_port))
+        tcp_ret_dict[ip] = high_port
+        all_port[ip] = tcp_port
 
         print("2.start to collect udp info")
         eip_tools.execute_cmd(GlobalConfig.udp_search_cmd.format(ip))
         udp_content_list = eip_tools.read_ip_result_txt()
         print("parse udp content:{}".format(udp_content_list))
-        udp_temp_list = eip_tools.parse_tcp_result_txt(config_obj, udp_content_list)
-        print("parse udp port:{}".format(udp_temp_list))
-        udp_ret_dict[ip] = udp_temp_list
+        high_port, udp_port = eip_tools.parse_result_txt(config_obj, udp_content_list)
+        print("parse udp port:{}".format(high_port))
+        udp_ret_dict[ip] = high_port
+        all_port[ip].extend(udp_port)
     print("Write the data to excel, the count of tcp ip:{}...".format(len(tcp_ret_dict.keys())))
-    print("Write the data to excel, the count of udp ip:{}...".format(len(udp_ret_dict.keys())))
     eip_tools.output_excel(tcp_ret_dict, "tcp")
+    print("Write the data to excel, the count of udp ip:{}...".format(len(udp_ret_dict.keys())))
     eip_tools.output_excel(udp_ret_dict, "udp")
+    print("Write the data to excel, the count of all ip:{}...".format(len(all_port.keys())))
+    eip_tools.output_excel(all_port, "all_port")
     print("###########4.query nginx server###################")
     tcp_server_info = EipTools.collect_tcp_server_info(tcp_ret_dict)
     eip_tools.output_excel(tcp_server_info, "tcp_server_info", is_server_info=True)
