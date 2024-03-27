@@ -248,8 +248,7 @@ class EipTools(object):
                                 continue
                             port_str = port.groups()[0].strip()
                             port_content = list(filter(lambda x: x != "", port_str.split('/')))
-                            if config_obj.get("high_risk_port") is not None and int(port_content[0]) in config_obj[
-                                "high_risk_port"]:
+                            if config_obj.get("high_risk_port") is not None and int(port_content[0]) in config_obj["high_risk_port"]:
                                 high_port.append(port_content)
                             all_port.append(port_content)
         return high_port, all_port
@@ -376,10 +375,11 @@ def main():
     config_obj = eip_tools.load_yaml(config_path)
     eip_tools.check_config_data(config_obj)
     print("############2.start to collect and output to excel######")
-    result_list = list()
     for config_item in config_obj["account_info"]:
+        result_list = list()
         ak = config_item["ak"]
         sk = config_item["sk"]
+        account = config_item["account"]
         project_info = HuaweiCloud.get_project_zone(ak, sk)
         if not project_info:
             print("ak:{}, sk:{} get empty project info.".format(ak[:5], sk[:5]))
@@ -388,40 +388,40 @@ def main():
             print("Collect the zone of info:{}".format(project_temp["zone"]))
             ret_temp = eip_tools.get_data_list(eip_tools, project_temp, ak, sk)
             result_list.extend(ret_temp or [])
-    result_list = list(set(result_list))
-    print("Write the data to txt, the count of ip:{}...".format(len(result_list)))
-    if not result_list:
-        return
-    print("###########3.lookup port###################")
-    tcp_ret_dict, udp_ret_dict, all_port = dict(), dict(), dict()
-    for ip in result_list:
-        print("1.start to collect tcp info")
-        eip_tools.execute_cmd(GlobalConfig.tcp_search_cmd.format(ip))
-        tcp_content_list = eip_tools.read_ip_result_txt()
-        print("parse tcp content:{}".format(tcp_content_list))
-        high_port, tcp_port = eip_tools.parse_result_txt(config_obj, tcp_content_list)
-        print("parse tcp port:{}".format(high_port))
-        tcp_ret_dict[ip] = high_port
-        all_port[ip] = tcp_port
+        result_list = list(set(result_list))
+        print("Write the data to txt, the count of ip:{}...".format(len(result_list)))
+        if not result_list:
+            continue
+        print("###########3.lookup port###################")
+        tcp_ret_dict, udp_ret_dict, all_port = dict(), dict(), dict()
+        for ip in result_list:
+            print("1.start to collect tcp info")
+            eip_tools.execute_cmd(GlobalConfig.tcp_search_cmd.format(ip))
+            tcp_content_list = eip_tools.read_ip_result_txt()
+            print("parse tcp content:{}".format(tcp_content_list))
+            high_port, tcp_port = eip_tools.parse_result_txt(config_obj, tcp_content_list)
+            print("parse tcp port:{}".format(high_port))
+            tcp_ret_dict[ip] = high_port
+            all_port[ip] = tcp_port
 
-        print("2.start to collect udp info")
-        eip_tools.execute_cmd(GlobalConfig.udp_search_cmd.format(ip))
-        udp_content_list = eip_tools.read_ip_result_txt()
-        print("parse udp content:{}".format(udp_content_list))
-        high_port, udp_port = eip_tools.parse_result_txt(config_obj, udp_content_list)
-        print("parse udp port:{}".format(high_port))
-        udp_ret_dict[ip] = high_port
-        all_port[ip].extend(udp_port)
-    print("Write the data to excel, the count of tcp ip:{}...".format(len(tcp_ret_dict.keys())))
-    eip_tools.output_excel(tcp_ret_dict, "tcp")
-    print("Write the data to excel, the count of udp ip:{}...".format(len(udp_ret_dict.keys())))
-    eip_tools.output_excel(udp_ret_dict, "udp")
-    print("Write the data to excel, the count of all ip:{}...".format(len(all_port.keys())))
-    eip_tools.output_excel(all_port, "all_port")
-    print("###########4.query nginx server###################")
-    tcp_server_info = EipTools.collect_tcp_server_info(tcp_ret_dict)
-    eip_tools.output_excel(tcp_server_info, "tcp_server_info", is_server_info=True)
-    print("##################5.finish################")
+            print("2.start to collect udp info")
+            eip_tools.execute_cmd(GlobalConfig.udp_search_cmd.format(ip))
+            udp_content_list = eip_tools.read_ip_result_txt()
+            print("parse udp content:{}".format(udp_content_list))
+            high_port, udp_port = eip_tools.parse_result_txt(config_obj, udp_content_list)
+            print("parse udp port:{}".format(high_port))
+            udp_ret_dict[ip] = high_port
+            all_port[ip].extend(udp_port)
+        print("Write the data to excel, the count of tcp ip:{}...".format(len(tcp_ret_dict.keys())))
+        eip_tools.output_excel(tcp_ret_dict, account + "_tcp")
+        print("Write the data to excel, the count of udp ip:{}...".format(len(udp_ret_dict.keys())))
+        eip_tools.output_excel(udp_ret_dict, account + "_udp")
+        print("Write the data to excel, the count of all ip:{}...".format(len(all_port.keys())))
+        eip_tools.output_excel(all_port, account + "_all_port")
+        print("###########4.query nginx server###################")
+        tcp_server_info = EipTools.collect_tcp_server_info(tcp_ret_dict)
+        eip_tools.output_excel(tcp_server_info, account + "_tcp_server_info", is_server_info=True)
+        print("##################5.finish################")
 
 
 if __name__ == "__main__":

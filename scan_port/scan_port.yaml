@@ -2,18 +2,24 @@ high_risk_port: [ 21, 22, 23, 69, 135, 137, 138, 139, 161, 177, 389, 445, 513, 8
 account_info:
   - ak:
     sk:
+    account:
 
   - ak:
     sk:
+    account:
 
   - ak:
     sk:
+    account:
 
   - ak:
     sk:
+    account:
 
   - ak:
     sk:
+    account:
 
   - ak:
     sk:
+    account:
