@@ -36,7 +36,8 @@ requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
 class GlobalConfig(object):
     base_path = os.path.dirname(__file__)
     txt_path = os.path.join(base_path, "ip.txt")
-    IGNORE_ZONE = ["cn-northeast-1", "MOS", "ap-southeast-1_tryme", "cn-north-1_1"]
+    # IGNORE_ZONE = ["cn-northeast-1", "MOS", "ap-southeast-1_tryme", "cn-north-1_1"]
+    IGNORE_ZONE = []
 
     ip_result_path = os.path.join(base_path, "ip_result.txt")
     config_path = os.path.join(base_path, "scan_port.yaml")
@@ -392,6 +393,8 @@ def main():
         print("Write the data to txt, the count of ip:{}...".format(len(result_list)))
         if not result_list:
             continue
+        with open("./{}.txt".format(account), "w") as f:
+            f.write("\n".join(result_list))
         print("###########3.lookup port###################")
         tcp_ret_dict, udp_ret_dict, all_port = dict(), dict(), dict()
         for ip in result_list:
