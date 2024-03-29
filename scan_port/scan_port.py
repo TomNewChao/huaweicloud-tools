@@ -36,8 +36,7 @@ requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
 class GlobalConfig(object):
     base_path = os.path.dirname(__file__)
     txt_path = os.path.join(base_path, "ip.txt")
-    # IGNORE_ZONE = ["cn-northeast-1", "MOS", "ap-southeast-1_tryme", "cn-north-1_1"]
-    IGNORE_ZONE = []
+    IGNORE_ZONE = ["cn-northeast-1", "MOS", "cn-north-1_1"]
 
     ip_result_path = os.path.join(base_path, "ip_result.txt")
     config_path = os.path.join(base_path, "scan_port.yaml")
