@@ -11,3 +11,5 @@
 ### 华为云安全策略组ip查询工具: get_security_group
 
 ### 华为云pod端口查询工具: scan_pod_port
+
+### etherpad敏感信息扫描工具（借助华为云内容审核） scan_etherpad
