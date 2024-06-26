@@ -1,5 +1,4 @@
 FROM openeuler/openeuler:22.03
-MAINTAINER TomNewChao<353712216@qq.com>
 ENV PYTHONUNBUFFERED 1
 RUN mkdir /opt/scan_pod_port
 WORKDIR /opt/scan_pod_port

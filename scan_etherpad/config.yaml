@@ -2,11 +2,12 @@ huawei_ak:
 huawei_sk:
 etherpad_url:
 etherpad_token:
+community:
 mta_sender:
-mta_receivers:
+mta_receivers: xxxxx@163.com,xxxx@huawei.com
 mta_ip:
 mta_port:
 mta_username:
 mta_password:
-mta_subject:
-scan_version_history:
+mta_subject: openEuler社区Etherpad敏感信息通知
+scan_version_history: false
