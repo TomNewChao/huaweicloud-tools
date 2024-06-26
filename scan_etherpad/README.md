@@ -19,4 +19,12 @@ scan_version_history: false   是否扫描etherpad的历史版本信息
 
 ### 使用说明
 python3 scan_etherpad.py --path=/root/config.yaml
-如果配置和脚本在同一目录中，则不需要携带path参数
+如果配置和脚本在同一目录中，则不需要携带path参数,也可以通过环境变量config_path获取
+
+#####部署建议
+1.先将config.yaml挂在在容器中。  \
+2.设置环境变量config_path为config.yaml挂载的位置 \
+3.启动容器运行 
+~~~
+docker run -it -v /root/scan_etherpad/config.yaml:/opt/config.yaml --env config_path=/opt/config.yaml scan_etherpad:latest
+~~~

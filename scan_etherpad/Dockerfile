@@ -1,6 +1,5 @@
 FROM openeuler/openeuler:22.03
 RUN yum update -y && yum install -y gcc-c++ python3 python3-pip python3-devel
-RUN python3 -m ensurepip --default-pip && python3 -m pip install --upgrade pip setuptools wheel
 RUN pip config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple
 RUN pip config set global.trusted-host pypi.tuna.tsinghua.edu.cn
 RUN pip config set global.timeout 120

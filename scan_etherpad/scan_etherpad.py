@@ -3,6 +3,7 @@
 # @Author  : Tom_zc
 # @FileName: scan_etherpad.py
 # @Software: PyCharm
+import os
 import textwrap
 import traceback
 
@@ -241,6 +242,8 @@ def send_email(config_obj):
 
 
 def _parse_config(config_path):
+    if not os.path.exists(config_path):
+        config_path = os.getenv("config_path")
     with open(config_path, "r", encoding="utf-8") as f:
         return yaml.safe_load(f)
 
