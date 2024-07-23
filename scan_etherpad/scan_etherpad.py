@@ -30,12 +30,21 @@ from huaweicloudsdkmoderation.v3 import ModerationClient, TextDetectionReq, RunT
 
 _yaml_fields = ["huawei_ak", "huawei_sk", "community_etherpad",
                 "mta_sender", "mta_receivers", "mta_ip", "mta_port",
-                "mta_username", "mta_password", "mta_subject", "scan_version_history"]
+                "mta_username", "mta_password", "mta_subject_sensor",
+                "mta_subject_count", "scan_version_history"]
 
 _notify_div_template = textwrap.dedent("""
     <div>
     <p>亲:</p>
     <p>这是osInfra扫描中心，etherpad敏感信息扫描结果如下图所示，共发现疑似包含敏感信息{}条，请及时处理：</p>
+    <div class="table-detail">{}</div>
+    </div>
+""").strip()
+
+_notify_count_template = textwrap.dedent("""
+    <div>
+    <p>亲:</p>
+    <p>这是osInfra扫描中心，etherpad数据统计结果如下图所示：</p>
     <div class="table-detail">{}</div>
     </div>
 """).strip()
@@ -117,15 +126,31 @@ class ScanResult:
     _scan_result = list()
 
     @classmethod
-    def update_result(cls, dict_data):
-        if not isinstance(dict_data, list):
+    def update_result(cls, list_data):
+        if not isinstance(list_data, list):
             raise RuntimeError("update_result must be list")
         with cls._lock:
-            cls._scan_result.extend(dict_data)
+            cls._scan_result.extend(list_data)
 
     @property
     def result(self):
         return self._scan_result
+
+
+class CountResult:
+    _lock = threading.Lock()
+    _count_result = list()
+
+    @classmethod
+    def update_result(cls, list_data):
+        if not isinstance(list_data, list):
+            raise RuntimeError("[CountResult] update_result must be list")
+        with cls._lock:
+            cls._count_result.extend(list_data)
+
+    @property
+    def result(self):
+        return self._count_result
 
 
 def scan_text(client, text):
@@ -176,7 +201,7 @@ def get_reject_describe(pad, community_etherpad, result):
     return reject_details
 
 
-def work(elc, cc, pad, community_etherpad):
+def work(elc, cc, pad, community_etherpad, empty_pad_name):
     pad_content = pad
     last_content = set()
     if community_etherpad.scan_version_history:
@@ -190,6 +215,9 @@ def work(elc, cc, pad, community_etherpad):
             last_content = last_content.union(line_sets)
     else:
         content = elc.getText(pad)
+        if (pad_content.strip().startswith("Welcome to Etherpad") and pad_content.strip().endswith("etherpad.org")) or (
+                len(pad_content.strip()) == 0):
+            empty_pad_name.append(pad)
         pad_content = pad + content["text"]
     pad_content_length = len(pad_content)
     if pad_content_length <= 1500:
@@ -227,12 +255,20 @@ def scan_single_community(community_etherpad):
     all_pads = elc.listAllPads()
     print("find the pads count:{}".format(len(all_pads["padIDs"])))
     scan_list = list()
+    empty_pad_name = list()
     for pad in all_pads["padIDs"]:
-        scan_single_list = work(elc, cc, pad, community_etherpad)
+        scan_single_list = work(elc, cc, pad, community_etherpad, empty_pad_name)
         if scan_single_list:
             scan_list.extend(scan_single_list)
     scan_result = ScanResult()
     scan_result.update_result(scan_list)
+    count_result = CountResult()
+    count_result.update_result([{
+        "community": community_etherpad.community,
+        "total_pad_count": len(all_pads["padIDs"]),
+        "empty_pad_count": len(empty_pad_name),
+        "empty_pad_name": ",".join(empty_pad_name)
+    }])
 
 
 def scan_etherpad(config_obj):
@@ -249,8 +285,9 @@ def scan_etherpad(config_obj):
 
 
 # noinspection PyTypeChecker,SpellCheckingInspection
-def generate_html():
+def generate_sensitive_html():
     cleaned_info = ScanResult().result
+    cleaned_info = sorted(cleaned_info, key=lambda x: (x["community"], x["confidence"]), reverse=True)
     pd.set_option('display.width', 800)
     pd.set_option('display.max_colwidth', 150)
     pd.set_option('colheader_justify', 'center')
@@ -264,14 +301,36 @@ def generate_html():
     return template_content
 
 
+# noinspection PyTypeChecker
+def generate_count_html():
+    cleaned_info = CountResult().result
+    pd.set_option('display.width', 400)
+    pd.set_option('display.max_colwidth', 200)
+    pd.set_option('colheader_justify', 'center')
+    pd.options.display.html.border = 2
+    df = pd.DataFrame.from_dict(cleaned_info)
+    df_style = df.style.hide_index()
+    html = df_style.render()
+    content = _notify_count_template.format(html)
+    template_content = _html_template.replace(r"{{template}}", content)
+    return template_content
+
+
 def send_email(config_obj):
     print("----------start to send email---------")
-    text = generate_html()
-    message = MIMEText(text, "html", 'utf-8')
-    message['Subject'] = Header(config_obj["mta_subject"], 'utf-8')
-    message['To'] = config_obj["mta_receivers"]
     smtp_obj = smtplib.SMTP(config_obj["mta_ip"], config_obj["mta_port"])
     smtp_obj.login(config_obj["mta_username"], config_obj["mta_password"])
+
+    text = generate_sensitive_html()
+    message = MIMEText(text, "html", 'utf-8')
+    message['Subject'] = Header(config_obj["mta_subject_sensor"], 'utf-8')
+    message['To'] = config_obj["mta_receivers"]
+    smtp_obj.sendmail(config_obj["mta_sender"], config_obj["mta_receivers"], message.as_string())
+
+    text = generate_count_html()
+    message = MIMEText(text, "html", 'utf-8')
+    message['Subject'] = Header(config_obj["mta_subject_count"], 'utf-8')
+    message['To'] = config_obj["mta_receivers"]
     smtp_obj.sendmail(config_obj["mta_sender"], config_obj["mta_receivers"], message.as_string())
 
 
