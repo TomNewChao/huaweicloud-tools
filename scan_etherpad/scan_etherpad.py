@@ -3,6 +3,7 @@
 # @Author  : Tom_zc
 # @FileName: scan_etherpad.py
 # @Software: PyCharm
+import os
 import textwrap
 import traceback
 
@@ -355,7 +356,10 @@ def _check_config(config_obj):
 @click.command()
 @click.option("--path", default="./config.yaml", help='The path of script config')
 def main(path):
-    config_obj = _parse_config(path)
+    config_path = os.getenv("CONFIG_PATH")
+    if not config_path:
+        config_path = path
+    config_obj = _parse_config(config_path)
     _check_config(config_obj)
     scan_etherpad(config_obj)
     send_email(config_obj)
