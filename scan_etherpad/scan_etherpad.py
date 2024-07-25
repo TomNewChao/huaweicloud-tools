@@ -170,7 +170,7 @@ def scan_text(client, text):
             return False, None
         return True, response.result.details
     except exceptions.ClientRequestException as e:
-        print("e:{}".format(e))
+        print("e:{}, traceback:{}".format(e, traceback.format_exc()))
         return True, None
     finally:
         # Dealing with frequency limiting
@@ -295,8 +295,8 @@ def generate_sensitive_html():
     pd.options.display.html.border = 2
     df = pd.DataFrame.from_dict(cleaned_info)
     format_dict = {'confidence': '{0:.3f}'}
-    df_style = df.style.hide_index().format(format_dict)
-    html = df_style.render()
+    df_style = df.style.hide().format(format_dict)
+    html = df_style.to_html()
     content = _notify_div_template.format(len(cleaned_info), html)
     template_content = _html_template.replace(r"{{template}}", content)
     return template_content
@@ -310,8 +310,8 @@ def generate_count_html():
     pd.set_option('colheader_justify', 'center')
     pd.options.display.html.border = 2
     df = pd.DataFrame.from_dict(cleaned_info)
-    df_style = df.style.hide_index()
-    html = df_style.render()
+    df_style = df.style.hide()
+    html = df_style.to_html()
     content = _notify_count_template.format(html)
     template_content = _html_template.replace(r"{{template}}", content)
     return template_content
