@@ -385,6 +385,7 @@ def main():
     for ip in result_list:
         if not ip.strip():
             continue
+        ip = ip.strip()
         print("1.start to collect tcp info")
         eip_tools.execute_cmd(GlobalConfig.tcp_search_cmd.format(ip))
         tcp_content_list = eip_tools.read_ip_result_txt()
