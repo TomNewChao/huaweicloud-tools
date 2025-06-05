@@ -1,20 +1,15 @@
-huawei_ak:
-huawei_sk:
+scan_url:
+scan_token:
 mta_sender:
 mta_receivers:
-mta_ip: 127.0.0.1
-mta_port: 25
+mta_ip:
+mta_port:
 mta_username:
 mta_password:
-mta_subject: Etherpad敏感信息通知
+mta_subject_sensor: Etherpad敏感信息通知
+mta_subject_count: Etherpad的PAD统计通知
 scan_version_history: false
 community_etherpad:
-  - etherpad_url:
-    etherpad_token:
-    community:
-  - etherpad_url:
-    etherpad_token:
-    community:
   - etherpad_url:
     etherpad_token:
     community:
