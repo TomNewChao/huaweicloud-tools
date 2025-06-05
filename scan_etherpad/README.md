@@ -3,8 +3,8 @@
 该工具借助华为内容审核对etherpad导出的数据进行敏感信息扫描，并通过邮件将扫描结果发出来。
 
 ### 2.配置说明
-huawei_ak:       华为云内容审核的ak  \
-huawei_sk:       华为云内容审核的sk  \
+scan_url:        内容审核的url  \
+scan_token:      内容审核的token  \
 etherpad_url:    etherpad的网址    \
 etherpad_token:  etherpad的token  \
 community:       社区              \

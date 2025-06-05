@@ -1,5 +1,5 @@
-huawei_ak:
-huawei_sk:
+scan_url:
+scan_token:
 mta_sender:
 mta_receivers:
 mta_ip: 127.0.0.1

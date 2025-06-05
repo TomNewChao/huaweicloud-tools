@@ -12,4 +12,4 @@
 
 ### 华为云pod端口查询工具: scan_pod_port
 
-### etherpad敏感信息扫描工具（借助华为云内容审核） scan_etherpad
+### etherpad敏感信息扫描工具（借助华为SCAS系统审核） scan_etherpad
