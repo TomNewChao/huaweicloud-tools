@@ -322,13 +322,13 @@ def send_email(config_obj):
     text = generate_sensitive_html()
     message = MIMEText(text, "html", 'utf-8')
     message['Subject'] = Header(config_obj["mta_subject_sensor"], 'utf-8')
-    message['To'] = Header(",".join(receives), "utf-8")
+    message['To'] = ",".join(receives)
     smtp_obj.sendmail(config_obj["mta_sender"], receives, message.as_string())
 
     text = generate_count_html()
     message = MIMEText(text, "html", 'utf-8')
     message['Subject'] = Header(config_obj["mta_subject_count"], 'utf-8')
-    message['To'] = Header(",".join(receives), "utf-8")
+    message['To'] = ",".join(receives)
     smtp_obj.sendmail(config_obj["mta_sender"], receives, message.as_string())
 
 
