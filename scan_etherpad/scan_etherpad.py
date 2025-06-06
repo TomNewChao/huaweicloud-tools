@@ -318,18 +318,18 @@ def send_email(config_obj):
     logger.info("----------start to send email---------")
     smtp_obj = smtplib.SMTP(config_obj["mta_ip"], config_obj["mta_port"])
     smtp_obj.login(config_obj["mta_username"], config_obj["mta_password"])
-
+    receives = config_obj["mta_receivers"].split(";")
     text = generate_sensitive_html()
     message = MIMEText(text, "html", 'utf-8')
     message['Subject'] = Header(config_obj["mta_subject_sensor"], 'utf-8')
-    message['To'] = config_obj["mta_receivers"]
-    smtp_obj.sendmail(config_obj["mta_sender"], config_obj["mta_receivers"], message.as_string())
+    message['To'] = Header(",".join(receives), "utf-8")
+    smtp_obj.sendmail(config_obj["mta_sender"], receives, message.as_string())
 
     text = generate_count_html()
     message = MIMEText(text, "html", 'utf-8')
     message['Subject'] = Header(config_obj["mta_subject_count"], 'utf-8')
-    message['To'] = config_obj["mta_receivers"]
-    smtp_obj.sendmail(config_obj["mta_sender"], config_obj["mta_receivers"], message.as_string())
+    message['To'] = Header(",".join(receives), "utf-8")
+    smtp_obj.sendmail(config_obj["mta_sender"], receives, message.as_string())
 
 
 def _parse_config(config_path):
