@@ -182,7 +182,11 @@ class AuditClient:
         if self._url is None or self._token is None:
             logger.info("AuditClient the url and token is not config")
             return True
-        json_data = self._post_audit(content)
+        try:
+            json_data = self._post_audit(content)
+        except Exception as e:
+            logger.info("check the content failed:{}".format(e))
+            return False
         return json_data["data"]["result"] == "pass"
 
 
